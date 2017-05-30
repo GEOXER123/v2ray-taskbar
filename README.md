@@ -1,4 +1,4 @@
-## 说明
+## 说明v2ray-taskbar 启动时会从 v2ray-taskbar.ini 文件中读取 V2Ray 可执行文件和配置文件，用于后台启动 V2Ray 程序。路径格式支持绝对路径和相对路径，填相对路径时，路径起点为 v2ray-taskbar 可执行文件所在的目录。
 v2ray-taskbar 启动时会从 v2ray-taskbar.ini 文件中读取 V2Ray 可执行文件和配置文件，用于
 后台启动 V2Ray 程序。路径格式支持绝对路径和相对路径，填相对路径时，路径起点为 v2ray-taskbar 
 可执行文件所在的目录。
