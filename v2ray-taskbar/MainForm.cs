@@ -21,14 +21,21 @@ namespace v2ray_taskbar
 	/// </summary>
 	public partial class MainForm : Form
 	{
+        private string m_taskbarName;
+        private string m_v2rayName;
+
+        private string m_v2ray_exe;
+        private string m_v2ray_conf;
+
 		public MainForm()
 		{
 			//
 			// The InitializeComponent() call is required for Windows Forms designer support.
 			//
 			InitializeComponent();
-			
-			Process[] processcollection = Process.GetProcessesByName("v2ray-taskbar");
+            ReadV2rayPara();
+
+            Process[] processcollection = Process.GetProcessesByName(m_taskbarName/*"v2ray-taskbar"*/);
 			if (processcollection.Length >= 2) {
 				MessageBox.Show("应用程序已经在运行中。。");
 				this.notifyIconV2ray.Visible = false;
@@ -46,7 +53,9 @@ namespace v2ray_taskbar
 		{
 			try {
 				Process p = new Process();
-				p.StartInfo.FileName = "v2ray.exe";
+                p.StartInfo.FileName = m_v2ray_exe/*"v2ray.exe"*/;
+                p.StartInfo.Arguments = "-config "+m_v2ray_conf;
+
 				p.StartInfo.UseShellExecute = false;
 				p.StartInfo.RedirectStandardOutput = true;
 				p.StartInfo.CreateNoWindow = true;
@@ -100,7 +109,7 @@ namespace v2ray_taskbar
 		{
 			this.notifyIconV2ray.Visible = false;
 			try {
-				Process[] killp = Process.GetProcessesByName("v2ray");
+				Process[] killp = Process.GetProcessesByName(m_v2rayName/*"v2ray"*/);
 				foreach (System.Diagnostics.Process p in killp) {
 					p.Kill();
 				}
@@ -124,7 +133,7 @@ namespace v2ray_taskbar
 				this.Activate();
 			}
 			try {
-				Process[] killp = Process.GetProcessesByName("v2ray");
+                Process[] killp = Process.GetProcessesByName(m_v2rayName/*"v2ray"*/);
 				foreach (System.Diagnostics.Process p in killp) {
 					p.Kill();
 				}
@@ -154,19 +163,102 @@ namespace v2ray_taskbar
 		void WatcherStrat()
 		{
 			FileSystemWatcher watcher = new FileSystemWatcher();
-			watcher.Path = Application.StartupPath;
-			watcher.Filter = "config.json";
+            watcher.Path = Path.GetDirectoryName(m_v2ray_conf);
+            watcher.Filter = Path.GetFileName(m_v2ray_conf);
 			watcher.NotifyFilter = NotifyFilters.LastWrite;
 			watcher.SynchronizingObject = this;
 			watcher.Changed += new FileSystemEventHandler(OnChanged);
 			watcher.EnableRaisingEvents = true;
+            watcher.NotifyFilter = NotifyFilters.LastWrite;
 		}
+        //配置文件更改后的响应函数
 		void OnChanged(object source, FileSystemEventArgs e)
 		{
 			try {
-				this.Reloaded();
+               this.Reloaded();
 			} catch (Exception) {
 			}
 		}
+        //读取运行参数,文件的路径都转换为绝对路径
+        public void ReadV2rayPara()
+        {
+            //v2ray默认参数
+            string curPath = Application.StartupPath;
+            Directory.SetCurrentDirectory(curPath);
+            m_v2ray_exe = curPath + "\\v2ray.exe";
+
+            //从ini配置文件读取v2ray的运行参数
+            string iniFullName = curPath + "\\v2ray-taskbar.ini";
+            if (!File.Exists(iniFullName))
+            {
+                string msg = string.Format("当前目录缺少v2ray-taskbar配置文件：\"v2ray-taskbar.ini\"！");
+                MessageBox.Show(msg, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Environment.Exit(0);
+            }
+            IniOper iniOper = new IniOper(iniFullName);
+
+            string cli= iniOper.ReadValue("config", "v2ray_exe");
+            if (cli == "")//参数值为空表示使用默认参数
+            {
+                if (File.Exists(curPath + "\\v2ray.exe"))
+                {
+                    m_v2ray_conf = curPath + "\\v2ray.exe";
+                }
+                else
+                {
+                    string msg = string.Format("当前目录找不到v2ray执行文件：\"v2ray.exe\"，请在ini文件中指定正确的可执行文件！");
+                    MessageBox.Show(msg, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(0);
+                }
+            }
+            else//使用ini文件中指定的参数
+            {
+                string fullPath = Path.GetFullPath(cli);
+                if (File.Exists(fullPath))
+                {
+                    m_v2ray_exe = fullPath;
+                }
+                else
+                {
+                    string msg = string.Format("找不到v2ray可执行文件。\n请检查ini文件中指定的v2ray可执行文件是否有效：\"{0}\"", fullPath);
+                    MessageBox.Show(msg, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(0);
+                }
+            }
+
+            string conf = iniOper.ReadValue("config", "v2ray_conf");
+            if (conf == "")//参数值为空表示使用默认参数
+            {
+                if (File.Exists(curPath + "\\config.json"))
+                {
+                    m_v2ray_conf = curPath + "\\config.json";
+                }
+                else//使用ini文件中指定的参数
+                {
+                    string msg = string.Format("当前目录找不到v2ray的默认配置文件:\"config.json\"，请在ini文件中指定正确的配置文件！");
+                    MessageBox.Show(msg, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(0);
+                }
+
+            }
+            else
+            {
+                string fullPath = Path.GetFullPath(conf);
+                if (File.Exists(fullPath))
+                {
+                    m_v2ray_conf = fullPath;
+                }
+                else
+                {
+                    string msg = string.Format("找不到v2ray的配置文件。\n请检查ini文件中指定的v2ray配置文件是否有效:\"{0}\"", fullPath);
+                    MessageBox.Show(msg, "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Environment.Exit(0);
+                }
+            }
+
+            string tbFullName = Application.ExecutablePath;
+            m_taskbarName = Path.GetFileNameWithoutExtension(tbFullName);
+            m_v2rayName = Path.GetFileNameWithoutExtension(m_v2ray_exe);
+        }
 	}
 }
